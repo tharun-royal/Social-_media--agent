@@ -582,8 +582,14 @@ HTML_PAGE = """<!DOCTYPE html>
   .card-head {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     margin-bottom: 16px;
+    gap: 10px;
+  }
+  .card-head-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .card-title {
     font-family: 'Space Grotesk', sans-serif;
@@ -608,9 +614,6 @@ HTML_PAGE = """<!DOCTYPE html>
     text-transform: uppercase;
     color: var(--paper-dim);
     margin-bottom: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
   }
 
   .block-text {
@@ -627,9 +630,11 @@ HTML_PAGE = """<!DOCTYPE html>
     border: 1px solid var(--line);
     color: var(--paper-dim);
     border-radius: 3px;
-    padding: 3px 8px;
+    padding: 5px 10px;
     cursor: pointer;
     transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .copy-btn:hover { border-color: var(--paper-dim); color: var(--paper); }
   .copy-btn:focus-visible { outline: 2px solid var(--brass); }
@@ -755,13 +760,14 @@ function copyBlock(btn, text) {
 }
 window.copyBlock = copyBlock;
 
+// Renders one card per platform with a SINGLE copy button in the card
+// header that copies all of that platform's content at once.
 function renderCard(kind, title, chLabel, blocks) {
+  const combinedRaw = blocks.map(b => b.raw).join('\\n\\n');
+
   const blocksHtml = blocks.map(b => `
     <div class="block">
-      <div class="block-label">
-        <span>${b.label}</span>
-        <button type="button" class="copy-btn" onclick='copyBlock(this, ${JSON.stringify(b.raw)})'>Copy</button>
-      </div>
+      <div class="block-label">${b.label}</div>
       <div class="${b.mono ? 'hashtags' : 'block-text'}">${escapeHtml(b.text)}</div>
     </div>
   `).join('');
@@ -769,8 +775,11 @@ function renderCard(kind, title, chLabel, blocks) {
   return `
     <div class="card ${kind}">
       <div class="card-head">
-        <span class="card-title">${title}</span>
-        <span class="card-ch">${chLabel}</span>
+        <div class="card-head-labels">
+          <span class="card-title">${title}</span>
+          <span class="card-ch">${chLabel}</span>
+        </div>
+        <button type="button" class="copy-btn" onclick='copyBlock(this, ${JSON.stringify(combinedRaw)})'>Copy all</button>
       </div>
       ${blocksHtml}
     </div>
