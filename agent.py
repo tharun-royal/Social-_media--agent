@@ -293,6 +293,576 @@ def _run(topic: str, brand: str, platforms: list[str], force_mock: bool = False)
 
 
 # ----------------------------------------------------------------------
+# Embedded frontend (single-file deployment — no templates/ folder needed)
+# ----------------------------------------------------------------------
+
+HTML_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatch — Social Media Content Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14171c;
+    --panel: #1b2028;
+    --panel-raised: #21272f;
+    --line: #2a303a;
+    --paper: #edeae4;
+    --paper-dim: #9aa1ac;
+    --brass: #c9972e;
+    --brass-bright: #e3ac3c;
+    --wire-blue: #4e9fe0;
+    --signal-teal: #3e8e85;
+    --transmission-rose: #c15b8c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  /* ---------- Header / Dispatch panel ---------- */
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 18px;
+  }
+
+  .eyebrow .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brass);
+    box-shadow: 0 0 0 3px rgba(201, 151, 46, 0.2);
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(32px, 5vw, 52px);
+    line-height: 1.05;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    color: var(--paper-dim);
+    font-size: 16px;
+    max-width: 46ch;
+    margin: 0 0 32px;
+  }
+
+  /* Signature: waveform */
+  .waveform {
+    width: 100%;
+    height: 40px;
+    margin-bottom: 40px;
+    overflow: hidden;
+  }
+  .waveform svg { display: block; width: 100%; height: 100%; }
+  .waveform path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.5;
+  }
+  .waveform path.active {
+    stroke: var(--brass);
+  }
+  .waveform.transmitting path.active {
+    stroke-dasharray: 6 10;
+    animation: pulse-flow 1.1s linear infinite;
+  }
+  @keyframes pulse-flow {
+    to { stroke-dashoffset: -32; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .waveform.transmitting path.active { animation: none; }
+  }
+
+  /* ---------- Form ---------- */
+
+  form {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 28px;
+  }
+
+  .field { margin-bottom: 20px; }
+
+  .field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 8px;
+  }
+
+  .field input[type="text"] {
+    width: 100%;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 12px 14px;
+    color: var(--paper);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+  }
+
+  .field input[type="text"]:focus,
+  .channel-toggle input:focus-visible + .channel-box {
+    outline: 2px solid var(--brass);
+    outline-offset: 1px;
+  }
+
+  .channels {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .channel-toggle {
+    position: relative;
+  }
+  .channel-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    margin: 0;
+  }
+  .channel-box {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 9px 16px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    color: var(--paper-dim);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .channel-toggle input:checked + .channel-box {
+    color: var(--ink);
+    background: var(--paper);
+    border-color: var(--paper);
+  }
+
+  .row-end {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 28px;
+  }
+
+  button[type="submit"] {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--brass);
+    color: var(--ink);
+    border: none;
+    border-radius: 3px;
+    padding: 13px 26px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button[type="submit"]:hover { background: var(--brass-bright); }
+  button[type="submit"]:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+  button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---------- Status line ---------- */
+
+  .status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    margin-top: 16px;
+    min-height: 18px;
+  }
+  .status.error { color: var(--transmission-rose); }
+
+  /* ---------- Briefing note ---------- */
+
+  .briefing {
+    display: none;
+    margin-top: 36px;
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    padding: 20px 24px;
+  }
+  .briefing.show { display: block; }
+  .briefing h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 14px;
+  }
+  .briefing dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 8px 20px;
+    margin: 0;
+  }
+  .briefing dt {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    padding-top: 2px;
+  }
+  .briefing dd { margin: 0; font-size: 14px; }
+  .briefing .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .briefing .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--brass);
+    background: rgba(201, 151, 46, 0.1);
+    padding: 3px 9px;
+    border-radius: 3px;
+  }
+
+  /* ---------- Channel cards ---------- */
+
+  .channels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 28px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: 4px;
+    padding: 22px;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: rise 0.4s ease forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card { animation: none; opacity: 1; transform: none; }
+  }
+  @keyframes rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card.twitter { border-left-color: var(--wire-blue); }
+  .card.linkedin { border-left-color: var(--signal-teal); }
+  .card.instagram { border-left-color: var(--transmission-rose); }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+  }
+  .card-ch {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+    letter-spacing: 0.08em;
+  }
+
+  .block { margin-bottom: 16px; }
+  .block:last-child { margin-bottom: 0; }
+
+  .block-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .block-text {
+    font-size: 14px;
+    white-space: pre-wrap;
+    color: var(--paper);
+  }
+
+  .copy-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    border-radius: 3px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .copy-btn:hover { border-color: var(--paper-dim); color: var(--paper); }
+  .copy-btn:focus-visible { outline: 2px solid var(--brass); }
+  .copy-btn.copied { color: var(--brass); border-color: var(--brass); }
+
+  .hashtags {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--brass);
+    line-height: 1.7;
+    word-break: break-word;
+  }
+
+  /* ---------- Empty state ---------- */
+
+  .empty {
+    margin-top: 28px;
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--paper-dim);
+    font-size: 14px;
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+  }
+  .empty strong { color: var(--paper); font-weight: 500; }
+
+  footer {
+    margin-top: 56px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow"><span class="dot"></span>DISPATCH</div>
+  <h1>One idea.<br>Three transmissions.</h1>
+  <p class="sub">Enter a topic and it goes out across Twitter/X, LinkedIn, and Instagram — each written for the channel it lands on.</p>
+
+<div class="waveform" id="waveform">
+    <svg viewBox="0 0 400 40" preserveAspectRatio="none">
+      <path class="track" d="M0,20 L400,20"></path>
+      <path class="active" id="waveline" d="M0,20 L400,20"></path>
+    </svg>
+  </div>
+
+  <form id="dispatch-form">
+    <div class="field">
+      <label for="topic">Topic</label>
+      <input type="text" id="topic" name="topic" placeholder="e.g. The rise of AI agents in 2025" required>
+    </div>
+    <div class="field">
+      <label for="brand">Brand <span style="opacity:0.6">(optional)</span></label>
+      <input type="text" id="brand" name="brand" placeholder="e.g. CloudSync">
+    </div>
+    <div class="field">
+      <label>Channels</label>
+      <div class="channels">
+        <label class="channel-toggle">
+          <input type="checkbox" name="platform" value="twitter" checked>
+          <span class="channel-box">Twitter / X</span>
+        </label>
+        <label class="channel-toggle">
+          <input type="checkbox" name="platform" value="linkedin" checked>
+          <span class="channel-box">LinkedIn</span>
+        </label>
+        <label class="channel-toggle">
+          <input type="checkbox" name="platform" value="instagram" checked>
+          <span class="channel-box">Instagram</span>
+        </label>
+      </div>
+    </div>
+    <div class="row-end">
+      <button type="submit" id="submit-btn">Broadcast →</button>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </form>
+
+  <div class="briefing" id="briefing">
+    <h3>Briefing note</h3>
+    <dl>
+      <dt>Message</dt><dd id="brief-message"></dd>
+      <dt>Audience</dt><dd id="brief-audience"></dd>
+      <dt>Hook</dt><dd id="brief-hook"></dd>
+      <dt>Tags</dt><dd class="tags" id="brief-tags"></dd>
+    </dl>
+  </div>
+
+  <div class="empty" id="empty-state">
+    Nothing transmitted yet. Enter a topic above and hit <strong>Broadcast</strong>.
+  </div>
+
+  <div class="channels-grid" id="results" style="display:none"></div>
+
+  <footer>social-media-content-agent · powered by gemini</footer>
+</div>
+
+<script>
+const form = document.getElementById('dispatch-form');
+const statusEl = document.getElementById('status');
+const submitBtn = document.getElementById('submit-btn');
+const waveform = document.getElementById('waveform');
+const resultsEl = document.getElementById('results');
+const emptyEl = document.getElementById('empty-state');
+const briefingEl = document.getElementById('briefing');
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function copyBlock(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1600);
+  });
+}
+window.copyBlock = copyBlock;
+
+function renderCard(kind, title, chLabel, blocks) {
+  const blocksHtml = blocks.map(b => `
+    <div class="block">
+      <div class="block-label">
+        <span>${b.label}</span>
+        <button type="button" class="copy-btn" onclick='copyBlock(this, ${JSON.stringify(b.raw)})'>Copy</button>
+      </div>
+      <div class="${b.mono ? 'hashtags' : 'block-text'}">${escapeHtml(b.text)}</div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="card ${kind}">
+      <div class="card-head">
+        <span class="card-title">${title}</span>
+        <span class="card-ch">${chLabel}</span>
+      </div>
+      ${blocksHtml}
+    </div>
+  `;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const topic = document.getElementById('topic').value.trim();
+  const brand = document.getElementById('brand').value.trim();
+  const platforms = Array.from(form.querySelectorAll('input[name="platform"]:checked')).map(el => el.value);
+
+  if (!topic) return;
+  if (platforms.length === 0) {
+    statusEl.textContent = 'Select at least one channel.';
+    statusEl.classList.add('error');
+    return;
+  }
+
+  statusEl.classList.remove('error');
+  statusEl.textContent = 'Transmitting…';
+  submitBtn.disabled = true;
+  waveform.classList.add('transmitting');
+  emptyEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, brand, platforms })
+    });
+
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const data = await res.json();
+
+    if (data.mode === 'mock' && data.strategy) {
+      document.getElementById('brief-message').textContent = data.strategy.message;
+      document.getElementById('brief-audience').textContent = data.strategy.audience;
+      document.getElementById('brief-hook').textContent = data.strategy.hook;
+      document.getElementById('brief-tags').innerHTML = data.strategy.hashtags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+      briefingEl.classList.add('show');
+
+      let html = '';
+      if (data.posts.twitter) {
+        const t = data.posts.twitter;
+        html += renderCard('twitter', 'Twitter / X', 'CH.1', [
+          { label: 'Variation 1', text: t.tweet_1, raw: t.tweet_1 },
+          { label: 'Variation 2', text: t.tweet_2, raw: t.tweet_2 },
+          { label: 'Thread opener', text: t.thread_opener, raw: t.thread_opener },
+        ]);
+      }
+      if (data.posts.linkedin) {
+        html += renderCard('linkedin', 'LinkedIn', 'CH.2', [
+          { label: 'Post', text: data.posts.linkedin, raw: data.posts.linkedin },
+        ]);
+      }
+      if (data.posts.instagram) {
+        const ig = data.posts.instagram;
+        html += renderCard('instagram', 'Instagram', 'CH.3', [
+          { label: 'Caption', text: ig.caption, raw: ig.caption },
+          { label: 'Hashtags', text: ig.hashtags.join(' '), raw: ig.hashtags.join(' '), mono: true },
+        ]);
+      }
+      resultsEl.innerHTML = html;
+      resultsEl.style.display = 'grid';
+    } else if (data.content) {
+      // live CrewAI mode returns a single text blob
+      briefingEl.classList.remove('show');
+      resultsEl.innerHTML = renderCard('linkedin', 'Generated Content', 'LIVE', [
+        { label: 'Output', text: data.content, raw: data.content },
+      ]);
+      resultsEl.style.display = 'grid';
+    }
+
+    statusEl.textContent = data.mode === 'mock'
+      ? 'Transmission complete (offline demo content — set GEMINI_API_KEY for live generation).'
+      : 'Transmission complete.';
+  } catch (err) {
+    statusEl.textContent = 'Transmission failed: ' + err.message;
+    statusEl.classList.add('error');
+  } finally {
+    submitBtn.disabled = false;
+    waveform.classList.remove('transmitting');
+  }
+});
+</script>
+</body>
+</html>
+"""
+
+# ----------------------------------------------------------------------
 # Flask web app — lets this run as a Render "Web Service" via:
 #   gunicorn agent:app
 # ----------------------------------------------------------------------
@@ -304,6 +874,11 @@ app = Flask(__name__)
 
 @app.get("/")
 def home():
+    return HTML_PAGE
+
+
+@app.get("/api")
+def api_info():
     return jsonify({
         "status": "ok",
         "service": "social-media-content-agent",
@@ -367,4 +942,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-         
