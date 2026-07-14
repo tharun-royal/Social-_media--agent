@@ -266,13 +266,86 @@ def render(topic: str, brand: str, platforms: list[str], strategy: dict, posts: 
 # Main
 # ----------------------------------------------------------------------
 
+def _run(topic: str, brand: str, platforms: list[str], force_mock: bool = False) -> dict:
+    """Core logic shared by the CLI and the web app. Returns a plain dict."""
+    use_mock = force_mock or not os.getenv("GEMINI_API_KEY")
+
+    if use_mock:
+        strategy = mock_strategy(topic, brand, platforms)
+        posts = mock_posts(topic, brand, platforms)
+        return {
+            "mode": "mock",
+            "topic": topic,
+            "brand": brand,
+            "platforms": platforms,
+            "strategy": strategy,
+            "posts": posts,
+        }
+    else:
+        content = generate_social_content_live(topic, brand, platforms)
+        return {
+            "mode": "live",
+            "topic": topic,
+            "brand": brand,
+            "platforms": platforms,
+            "content": content,
+        }
+
+
+# ----------------------------------------------------------------------
+# Flask web app — lets this run as a Render "Web Service" via:
+#   gunicorn agent:app
+# ----------------------------------------------------------------------
+
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+
+@app.get("/")
+def home():
+    return jsonify({
+        "status": "ok",
+        "service": "social-media-content-agent",
+        "usage": "POST /generate with JSON: {\"topic\": \"...\", \"brand\": \"...\", \"platforms\": [\"twitter\",\"linkedin\",\"instagram\"]}",
+    })
+
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "healthy"})
+
+
+@app.post("/generate")
+def generate():
+    data = request.get_json(silent=True) or {}
+    topic = data.get("topic", "How AI is transforming software development in 2025")
+    brand = data.get("brand", "")
+    platforms = data.get("platforms", ["twitter", "linkedin", "instagram"])
+    platforms = [p.strip().lower() for p in platforms]
+    force_mock = bool(data.get("mock", False))
+
+    result = _run(topic, brand, platforms, force_mock=force_mock)
+    return jsonify(result)
+
+
+# ----------------------------------------------------------------------
+# CLI entrypoint — still works locally: python agent.py --topic "..."
+# ----------------------------------------------------------------------
+
 def main():
     parser = argparse.ArgumentParser(description="Social Media Content Agent")
     parser.add_argument("--topic", default="How AI is transforming software development in 2025", help="Content topic")
     parser.add_argument("--brand", default="", help="Brand name (optional)")
     parser.add_argument("--platforms", default="twitter,linkedin,instagram", help="Comma-separated platforms")
     parser.add_argument("--mock", action="store_true", help="Run offline without calling any LLM API")
+    parser.add_argument("--serve", action="store_true", help="Run as a local Flask web server instead of CLI")
     args = parser.parse_args()
+
+    if args.serve:
+        port = int(os.getenv("PORT", 5000))
+        app.run(host="0.0.0.0", port=port)
+        return
 
     platforms = [p.strip().lower() for p in args.platforms.split(",")]
 
@@ -294,4 +367,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-  
+         
