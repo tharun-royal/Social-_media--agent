@@ -161,7 +161,7 @@ def generate_social_content_live(topic: str, brand: str, platforms: list[str]) -
     # environment automatically (no need to pass api_key= explicitly,
     # though you can if you prefer).
     llm = LLM(
-        model="gemini/gemini-1.5-flash",
+        model="gemini/gemini-2.5-flash",
         temperature=0.7,
         api_key=os.getenv("GEMINI_API_KEY"),
     )
@@ -671,7 +671,6 @@ HTML_PAGE = """<!DOCTYPE html>
   <div class="eyebrow"><span class="dot"></span>DISPATCH</div>
   <h1>One idea.<br>Three transmissions.</h1>
   <p class="sub">Enter a topic and it goes out across Twitter/X, LinkedIn, and Instagram — each written for the channel it lands on.</p>
-
   <div class="waveform" id="waveform">
     <svg viewBox="0 0 400 40" preserveAspectRatio="none">
       <path class="track" d="M0,20 L400,20"></path>
