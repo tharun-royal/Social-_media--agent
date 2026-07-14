@@ -672,7 +672,7 @@ HTML_PAGE = """<!DOCTYPE html>
   <h1>One idea.<br>Three transmissions.</h1>
   <p class="sub">Enter a topic and it goes out across Twitter/X, LinkedIn, and Instagram — each written for the channel it lands on.</p>
 
-<div class="waveform" id="waveform">
+  <div class="waveform" id="waveform">
     <svg viewBox="0 0 400 40" preserveAspectRatio="none">
       <path class="track" d="M0,20 L400,20"></path>
       <path class="active" id="waveline" d="M0,20 L400,20"></path>
@@ -846,9 +846,14 @@ form.addEventListener('submit', async (e) => {
       resultsEl.style.display = 'grid';
     }
 
-    statusEl.textContent = data.mode === 'mock'
-      ? 'Transmission complete (offline demo content — set GEMINI_API_KEY for live generation).'
-      : 'Transmission complete.';
+    if (data.warning) {
+      statusEl.textContent = data.warning;
+      statusEl.classList.add('error');
+    } else {
+      statusEl.textContent = data.mode === 'mock'
+        ? 'Transmission complete (offline demo content — set GEMINI_API_KEY for live generation).'
+        : 'Transmission complete.';
+    }
   } catch (err) {
     statusEl.textContent = 'Transmission failed: ' + err.message;
     statusEl.classList.add('error');
@@ -900,8 +905,24 @@ def generate():
     platforms = [p.strip().lower() for p in platforms]
     force_mock = bool(data.get("mock", False))
 
-    result = _run(topic, brand, platforms, force_mock=force_mock)
-    return jsonify(result)
+    try:
+        result = _run(topic, brand, platforms, force_mock=force_mock)
+        return jsonify(result)
+    except Exception as exc:
+        # Surface the real error instead of a bare, unexplained 500.
+        # Falls back to mock content so the UI still shows something useful.
+        app.logger.exception("generate() failed, falling back to mock content")
+        strategy = mock_strategy(topic, brand, platforms)
+        posts = mock_posts(topic, brand, platforms)
+        return jsonify({
+            "mode": "mock",
+            "topic": topic,
+            "brand": brand,
+            "platforms": platforms,
+            "strategy": strategy,
+            "posts": posts,
+            "warning": f"Live generation failed ({type(exc).__name__}: {exc}); showing offline demo content instead.",
+        }), 200
 
 
 # ----------------------------------------------------------------------
