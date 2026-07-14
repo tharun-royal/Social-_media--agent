@@ -760,10 +760,17 @@ function copyBlock(btn, text) {
 }
 window.copyBlock = copyBlock;
 
+// Raw copy text is kept here (never re-serialized into HTML/attributes,
+// which avoids quote-escaping bugs when content contains apostrophes
+// like "isn't" or "they're").
+const cardCopyText = [];
+
 // Renders one card per platform with a SINGLE copy button in the card
 // header that copies all of that platform's content at once.
 function renderCard(kind, title, chLabel, blocks) {
   const combinedRaw = blocks.map(b => b.raw).join('\\n\\n');
+  const cardIndex = cardCopyText.length;
+  cardCopyText.push(combinedRaw);
 
   const blocksHtml = blocks.map(b => `
     <div class="block">
@@ -779,11 +786,20 @@ function renderCard(kind, title, chLabel, blocks) {
           <span class="card-title">${title}</span>
           <span class="card-ch">${chLabel}</span>
         </div>
-        <button type="button" class="copy-btn" onclick='copyBlock(this, ${JSON.stringify(combinedRaw)})'>Copy all</button>
+        <button type="button" class="copy-btn" data-card-index="${cardIndex}">Copy all</button>
       </div>
       ${blocksHtml}
     </div>
   `;
+}
+
+function wireCopyButtons(container) {
+  container.querySelectorAll('.copy-btn[data-card-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.getAttribute('data-card-index'));
+      copyBlock(btn, cardCopyText[idx]);
+    });
+  });
 }
 
 form.addEventListener('submit', async (e) => {
@@ -805,6 +821,7 @@ form.addEventListener('submit', async (e) => {
   submitBtn.disabled = true;
   waveform.classList.add('transmitting');
   emptyEl.style.display = 'none';
+  cardCopyText.length = 0; // reset copy-text registry for this run
 
   try {
     const res = await fetch('/generate', {
@@ -846,6 +863,7 @@ form.addEventListener('submit', async (e) => {
       }
       resultsEl.innerHTML = html;
       resultsEl.style.display = 'grid';
+      wireCopyButtons(resultsEl);
     } else if (data.content) {
       // live CrewAI mode returns a single text blob
       briefingEl.classList.remove('show');
@@ -853,6 +871,7 @@ form.addEventListener('submit', async (e) => {
         { label: 'Output', text: data.content, raw: data.content },
       ]);
       resultsEl.style.display = 'grid';
+      wireCopyButtons(resultsEl);
     }
 
     if (data.warning) {
